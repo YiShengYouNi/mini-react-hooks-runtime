@@ -1,0 +1,11 @@
+{
+  "name": "mini-react-hooks-runtime",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
