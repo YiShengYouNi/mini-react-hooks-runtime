@@ -21,5 +21,5 @@ function App() {
 
 render(App);
 
-setTimeout(() => setCount((prev: number) => prev + 1), 1000);
-setTimeout(() => dispatch('dec'), 2000);
+setTimeout(() => setCount!((prev: number) => prev + 1), 1000);
+setTimeout(() => dispatch!('dec'), 2000);

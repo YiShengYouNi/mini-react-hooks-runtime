@@ -1,4 +1,4 @@
-import { prepareToRender } from './react';
+import { prepareToRender, Fiber } from './react';
 
 export function scheduleUpdate() {
   console.log('\n🌀 Trigger re-render...');
@@ -6,11 +6,14 @@ export function scheduleUpdate() {
 }
 
 let currentComponent: Function;
+let fiber: Fiber | null = null;
 
 export function render(Component: Function) {
-  const fiber = {
-    memoizedState: null,
-  };
+  if (!fiber) {
+    fiber = {
+      memoizedState: null, // 首次构建
+    };
+  }
 
   prepareToRender(fiber);
   currentComponent = Component;
