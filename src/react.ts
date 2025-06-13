@@ -1,8 +1,11 @@
-type Fiber = {
+export type Fiber = {
   memoizedState: Hook | null;
-  updateQueue?: {
-    lastEffect: Effect | null; // 环状链表的尾节点（last.next 指向首节点）
-  }; // 用于保存当前组件注册的所有 effect
+  updateQueue?: UpdateQueue; // 用于保存当前组件注册的所有 effect
+  alternate?: Fiber | null; // 👈 上一次渲染的 fiber
+};
+
+export type UpdateQueue = {
+  lastEffect: Effect | null;             // 指向 Effect 环状链表的最后一个节点（首节点为 lastEffect.next）
 };
 
 type Hook = {
@@ -12,7 +15,7 @@ type Hook = {
   dispatch?: (action: any) => void;
 };
 
-type Effect = {
+export type Effect = {
   tag: 'effect' | 'layout' | 'passive'; // 用于标记 effect 的类型
   create: () => void | (() => void);
   destroy?: () => void;
@@ -20,9 +23,10 @@ type Effect = {
   next: Effect | null;
 };
 
+export
 
 
-let isMount = true;
+  let isMount = true;
 let workInProgressHook: Hook | null = null;
 let currentlyRenderingFiber: Fiber = { memoizedState: null, };
 let effectList: Effect | null = null;
@@ -101,42 +105,53 @@ export function useReducer(reducer: Function, initialArg: any) {
 // 模拟 useEffect
 export function useEffect(create: () => void | (() => void), deps?: any[]) {
   const hook = mountWorkInProgressHook();
+  const fiber = currentlyRenderingFiber!;
+  if (!fiber.updateQueue) fiber.updateQueue = { lastEffect: null };
+  // 从 alternate fiber 获取上一次 effect
+  const prevFiber = fiber.alternate
+  const prevLastEffect = prevFiber?.updateQueue?.lastEffect;
 
-  const hasChanged =
-    !hook.memoizedState ||
-    !deps ||
-    deps.some((dep, i) => dep !== hook.memoizedState[i]);
+  let destroy: (() => void) | undefined = undefined;
+  console.log('🔍 [prevLastEffect]:', prevLastEffect);
+  if (prevLastEffect) {
+    let prevEffect = prevLastEffect.next!; // 获取上一次 effect 链表的首节点
+    console.log('[🔍 prevEffect chain]', JSON.stringify(prevEffect, null, 2));
+    do {
+      const isSameDeps =
+        deps &&
+        prevEffect.deps &&
+        deps.length === prevEffect.deps.length &&
+        deps.every((dep, i) => Object.is(dep, prevEffect.deps![i]));
 
-  if (hasChanged) {
-    // 注册 effect 到当前 fiber
-    const fiber = currentlyRenderingFiber!;
-    if (!fiber.updateQueue) fiber.updateQueue = { lastEffect: null };
-
-    // 构建一个新的 effect 对象
-    const effect: Effect = {
-      tag: 'effect',
-      create,
-      destroy: undefined,
-      deps: deps ?? null,
-      next: null,
-    };
-    // 构建 effect 链表
-    const lastEffect = fiber.updateQueue.lastEffect;
-    if (lastEffect === null) {  // 如果是第一个 effect
-      effect.next = effect; // 环状链表的首节点
-    } else {
-      effect.next = lastEffect.next; // 将新 effect 的 next 指向链表首节点
-      lastEffect.next = effect; // 将上一个 effect 的 next 指向新 effect
-    }
-    // 更新 lastEffect
-    fiber.updateQueue.lastEffect = effect;
+      if (isSameDeps) {
+        destroy = prevEffect.destroy;
+        console.log('🧬 [Effect matched & reused destroy]');
+        break;
+      }
+      prevEffect = prevEffect.next!;
+    } while (prevEffect !== prevLastEffect.next);
   }
 
+  const effect: Effect = {
+    tag: 'effect',
+    create,
+    destroy, // 如果有上一次的 destroy 函数，则复用
+    deps: deps ?? null,
+    next: null,
+  };
+
+
+  const lastEffect = fiber.updateQueue.lastEffect;
+  if (lastEffect === null) {
+    effect.next = effect;
+  } else {
+    effect.next = lastEffect.next;
+    lastEffect.next = effect;
+  }
+  fiber.updateQueue.lastEffect = effect;
   // 保存 deps
   hook.memoizedState = deps ?? null;
 }
-
-
 
 
 export function scheduleUpdate() {
@@ -162,7 +177,7 @@ export function commitEffects(fiber: Fiber) {
   let firstEffect = updateQueue.lastEffect.next!; // 获取第一个 effect
   let effect = firstEffect; // 从第一个 effect 开始处理
   do {
-    console.log('[🧹 Cleanup Executed]');
+    console.log('[🧹 Cleanup Executed]：', effect.destroy);
     effect.destroy?.(); // 清理上次副作用
     const cleanup = effect.create(); // 执行副作用创建函数
     if (typeof cleanup === 'function') {
@@ -178,3 +193,4 @@ export function commitEffects(fiber: Fiber) {
     fiber.updateQueue.lastEffect = null;
   }
 }
+

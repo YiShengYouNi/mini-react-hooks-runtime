@@ -16,7 +16,7 @@ function App() {
     };
   }, [count]);
 
-  console.log('👀 Render: count =', count, ', total =', total);
+  // console.log('👀 Render: count =', count, ', total =', total);
 
   globalThis.setCount = setCount;
   globalThis.dispatch = dispatch;
